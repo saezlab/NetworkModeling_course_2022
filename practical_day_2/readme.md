@@ -35,4 +35,4 @@ Assess the relevance of your findings: is it a similar type of disease (e.g. can
 
 Is this connection a potentially interesting futur therapeutic target: Is it a connection that is specific to disease phenotype or general biological function ? Are there existing inhibitors that can target key nodes ofthe pathway? Are there obvious biological alternative routes that could help the cancer cells escape the treatment ? Are those genes associated with poor prognostic (check https://www.proteinatlas.org/)?
 
-What futur experiements could be planed validate this set of mechanistic hypotheses ?
+What futur experiments could be planed validate this set of mechanistic hypotheses ?
