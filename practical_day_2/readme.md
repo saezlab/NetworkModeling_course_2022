@@ -1,6 +1,10 @@
 # Day 2 practical: multi-omic integration with cosmos
 
-Material for the practical: https://github.com/saezlab/cosmosR/blob/master/vignettes/tutorial.md
+This practical will teach you how to integrate multi-omic data downstream of footprint analysis with R package COSMOS.
+
+You can read the COSMOS publication here: https://www.embopress.org/doi/full/10.15252/msb.20209730
+
+Material for the practical can be found here: https://github.com/saezlab/cosmosR/blob/master/vignettes/tutorial.md
 
 You can also clone the cosmosR repository on your local machine (see: https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) and open the tutorial.Rmd in Rstudio
 
