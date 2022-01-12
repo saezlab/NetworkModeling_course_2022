@@ -8,7 +8,7 @@ Requires R>= 4.1
 
 ## Installation
 
-Instal cosmos
+Install cosmos
 
 ```r
 # install the development version from GitHub
