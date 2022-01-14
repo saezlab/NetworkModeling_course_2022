@@ -12,7 +12,7 @@ output:
 
 # About
 
-This vignette contains the material for the first practical session of the Network Analysis course. It was developed by the [Saez-Rodriguez group members](https://saezlab.org/). The estimated required time to go over the content of the tutorial is of ~ 3 hours. This is the schedule for the practical session:
+This vignette contains the material for the first practical session of the Network Analysis course. It was developed by the [Saez-Rodriguez group members](https://saezlab.org/). The estimated time to go over the content of the tutorial is of ~ 3 hours. This is the schedule for the practical session:
 
 - Introduction, setup and troubleshooting: 20 minutes
 - Bulk RNA-Seq data quality control and normalization: 30 minutes
@@ -78,17 +78,17 @@ In this tutorial we will work with a subset of the transcriptomics data availabl
 
 # RNA-Seq
 
-The authors of the study employed RNA sequencing (RNA-Seq) to obtain the basal transcriptomic profiles of both A2780 and A2780cis. RNA-Seq is a technology based on Next Generation Sequencing (NGS) that allows researchers to massively measure the abundance of the RNA molecules in a sample. Starting from the biological sample of interest (e.g. the cell culture), the common steps to perform bulk RNA-Sequencing includes: 1) Total RNA extraction and target enrichment, 2) Fragmentation and reverse transcription and amplification (a.k.a. library preparation) and 3) Sequencing of the library (using, for example, Illumina's NextSeq 500). The output of this process consists of thousands of sequences (a.k.a. reads) which are then aligned to a reference genome/transcriptome to obtain a "count" matrix. This count matrix reflects the number of reads that align in a set of genomic regions of interest, and it represents the level to which that region is being expressed by the cells in a given sample. Those regions usually comprise genes, but they can also include other types of transcribed DNA regions, such as microRNAs (miRNAs) or long non-coding RNAs (lncRNAs). This gene expression data is high-throughput, covering on the scale of 10^4^ genes, and gives a detailed snapshot of the transcriptional activity of the cell sample under a given experimental condition at a moment in time.
+The authors of the study employed RNA sequencing (RNA-Seq) to obtain the basal transcriptomic profiles of both A2780 and A2780cis. RNA-Seq is a technology based on Next Generation Sequencing (NGS) that allows researchers to massively measure the abundance of the RNA molecules in a sample. Starting from the biological sample of interest (e.g. the cell culture), the common steps to perform bulk RNA-Sequencing include: 1) Total RNA extraction and target enrichment, 2) Fragmentation and reverse transcription and amplification (a.k.a. library preparation) and 3) Sequencing of the library (using, for example, Illumina's NextSeq 500). The output of this process consists of thousands of sequences (a.k.a. reads) which are then aligned to a reference genome/transcriptome to obtain a "count" matrix. This count matrix reflects the number of reads that align in a set of genomic regions of interest, and it represents the level to which that region is being expressed in a given sample. Those regions usually comprise genes, but they can also include other types of transcribed DNA regions, such as microRNAs (miRNAs) or long non-coding RNAs (lncRNAs). This gene expression data is high-throughput, covering on the scale of 10^4^ genes, and gives a detailed snapshot of the transcriptional activity of the cell sample under a given experimental condition at a moment in time.
 
 ![](https://www.annualreviews.org/na101/home/literatum/publisher/ar/journals/content/biodatasci/2019/biodatasci.2019.2.issue-1/annurev-biodatasci-072018-021255/20190704/images/medium/bd020139.f1.gif)
 
 Figure from [Van den Berge et al. 2019](https://www.annualreviews.org/doi/abs/10.1146/annurev-biodatasci-072018-021255)
 
-Traditional RNA-Seq protocols measures the RNA samples obtained from a cell population that can be more or less heterogeneous (**bulk**). In contrast to theme, novel techniques enable researchers to obtain transcriptomic profiles that are resolved at the single-cell level or that are spatially resolved. **Here we will focus on bulk RNA-Seq data**. For more information about single-cell and spatial transcriptomic technologies, we recommend users to read the comprehensive review written by [Stark et al](https://www.nature.com/articles/s41576-019-0150-2).
+Traditional RNA-Seq protocols measures the RNA samples obtained from a cell population that can be more or less heterogeneous (**bulk**). In contrast to them, novel techniques enable researchers to obtain transcriptomic profiles that are resolved at the single-cell level or that are spatially resolved. **Here we will focus on bulk RNA-Seq data**. For more information about single-cell and spatial transcriptomic technologies, we recommend users to read the comprehensive review written by [Stark et al](https://www.nature.com/articles/s41576-019-0150-2).
 
 # Loading packages and data in R
 
-We will first load the packages that we will employ during the tutorial
+We first load the packages that we will employ during the tutorial
 
 ```{r, message=FALSE}
 library(tidyverse)
@@ -115,13 +115,13 @@ metadata <- readr::read_tsv("data/metadata.tsv")
 
 **NOTE**: In the second line, we employ different functions to read the tables. The first one, `read.table()`, is a base R function. The second one, `read_tsv()`, belongs to the `readr` package, which is part of the `tidyverse` collection. We use the `::` nomenclature to indicate the package that provides the function. This is a good R coding practice, because it prevents the conflicts that may appear as a product of common function names between packages. However, while using such nomenclature is recommended, it is not mandatory when the name of functions is less likely to cause conflicts. 
 
-Next, we can now explore how the first rows of the counts matrix looks like. In this matrix, rows correspond to genes (here, labelled by their [HUGO gene symbol](https://www.genenames.org/)) and columns represent samples from which the expression data was measured.
+Next, we can explore how the first rows of the count matrix look like. In this matrix, rows correspond to genes (here, labelled by their [HUGO gene symbol](https://www.genenames.org/)) and columns represent samples.
 
 ```{r}
 head(counts)
 ```
 
-We can also explore the content of the metadata table, which contain the properties/annotations of each sample. Additional information that can be found in this type of tables include whether data is paired or not, or for example known batch effects, such as different sequencing lanes. Very often, this information is not explicitly provided but can be inferred from the sample name: e.g. PATIENT1_TUMOR_BATCH1 vs PATIENT2_NORMAL_BATCH2. 
+We can also explore the content of the metadata table, which contain the properties/annotations for each sample. This table may include information like known batch effects or sample pairs. Very often, this information is not explicitly provided but can be inferred from the sample name: e.g. PATIENT1_TUMOR_BATCH1 vs PATIENT2_NORMAL_BATCH2. 
 
 ```{r}
 metadata
@@ -131,7 +131,7 @@ metadata
 
 ## Checking library size
 
-Before being able to compare data from both cell lines, we should perform basic quality control analyses and some pre-processing of the count matrix. In a first step, we can take a look to the total number of sequences per sample, which is also known as the library size. This reflects the sequencing depth and it is a good indicator of of homogeneity in the sequencing process of the samples.
+Before being able to compare data from both cell lines, we should perform basic quality control analyses and some pre-processing of the count matrix. In a first step, we can take a look to the total number of sequences per sample, which is also known as library size. This provides information about the sequencing depth and is a good indicator of differences or batch effects in the sequencing process.
 
 ```{r}
 data.frame(sample = colnames(counts), n_counts = colSums(counts)) %>%
@@ -140,11 +140,11 @@ data.frame(sample = colnames(counts), n_counts = colSums(counts)) %>%
   ggplot2::scale_y_continuous()
 ```
 
-**NOTE**: Inside this code chunk, we employ several functions. First, we create a data frame with the id of the samples and the total number of counts for each of them using the `data.frame()` and the `colSums()` functions. Next, we pass this data frame object to the `ggplot()` function to start creating the plot. This is done thanks to the pipe operand `%>%`, which passes the data frame created before it to to the function positioned after. For more information about the pipe operand please see [this documentation page](https://style.tidyverse.org/pipes.html). 
+**NOTE**: Inside this code chunk, we employ several functions. First, we create a data frame with the id of the samples and the total number of counts for each of them using the `data.frame()` and the `colSums()` functions. Next, we pass this data frame object to the `ggplot()` function to start creating the plot. This is done thanks to the pipe operand `%>%`, which "sends" the data frame to the function positioned after it. For more information about the pipe operand please see [this documentation page](https://style.tidyverse.org/pipes.html). 
 
-**NOTE**: The ggplot2 package, which is part of the `tidyverse` collection, is here employed to create the plot. ggplot2 comprises a powerful yet simple framework to create and modify high-quality graphics. For more information, please see [ggplot2 homepage](https://ggplot2.tidyverse.org/).
+**NOTE**: The `ggplot2` package, which is part of the `tidyverse` collection, is here employed to create the plot. `ggplot2` comprises a powerful yet simple framework to create and edit high-quality graphics. For more information, please see [`ggplot2` homepage](https://ggplot2.tidyverse.org/).
 
-As it can be observed in the plot, the library sizes range from 4 to 5 millions of sequences. This means that the ratio between the largest and the smallest libraries is of ~ 1.25. This is an acceptable value for most statistical approaches. When this ratio is higher than ~3, ad-hoc adjustments should be made to consider the heterogeneity in library sizes. We will talk more about this in the [normalization](#Normalization) section of the tutorial. 
+As it can be observed in the plot, the library sizes range from 4 to 5 millions of sequences. This means that the ratio between the largest and the smallest libraries is of ~ 1.25. This is an acceptable value for most statistical approaches. When this ratio is higher than ~3, ad-hoc adjustments should be made to consider the heterogeneity in library sizes. We will talk more about this in the [normalization](#normalization) section of the tutorial. 
 
 ## Filtering lowly expressed genes
 
@@ -208,11 +208,11 @@ plot_count_distribution(counts_filtered) +
   ggplot2::ggtitle("Filtered")
 ```
 
-As it can be observed, a huge proportion of the counts with few counts were filtered. To aid visualization, we log transformed raw counts.
+To aid visualization, we log transformed raw counts. As it can be observed, the low-counts region of the plot becomes less prominent after the filtering. 
 
 **NOTE**: Go to the chunk of code where we create the `plot_count_distribution()` and substitute the line `geom_histogram(binwidth = 0.1) +` with `geom_density() +`. Then run again the chunks that create the plots. What happens? Run `help(density)` in your terminal to get more information about kernel density estimation.
 
-**OPTIONAL**: Probability distribution in count-based data (negative binomial vs bimodal).
+**OPTIONAL**: Probability distribution in count-based data (negative binomial vs bimodal)
 
 # Normalization
 
@@ -243,9 +243,9 @@ head(norm_expr)
 
 # Differential Expression Analysis
 
-Next, we can analyze the differences between the transcriptomic profiles of both cell lines. To do so, we will carry out what is known as Differential Expression Analysis (DEA). This is basically a statistical analysis where all the genes in the count matrix are compared between the sample groups of interest. To perform DEA, we use the `limma` package. `limma` was originally released as a software package to perform the statistical analysis of microarray data, but was later [adapted for the analysis of RNA-Seq](https://academic.oup.com/nar/article/43/7/e47/2414268). `limma` fits a linear model for each gene according to the experimental design to test the null hypothesis that no gene is differentially expressed between experimental conditions, and calculates a moderated *t*-statistic. To do so, it uses an empirical Bayes method to improve estimation of the underlying variance. For more information, please see "Shared global parameters link gene-wise models" and "Empirical Bayes borrows information between genes" of the aforementioned paper. `limma` is not the only option to perform DEA. Common alternatives include [`edgeR`](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2796818/) and [`DESeq2`](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-014-0550-8). The strategy that we employ here is known as limma-trend, where the initial count matrix is normalized using `edgeR` but the DEA is carried out with `limma`. For more information please see [Limma's users guide](https://www.bioconductor.org/packages/devel/bioc/vignettes/limma/inst/doc/usersguide.pdf).
+Next, we can analyze the differences between the transcriptomic profiles of both cell lines. To do so, we carry out what is known as Differential Expression Analysis (DEA). This is a statistical analysis where all genes in the count matrix are compared between the sample groups of interest. To perform DEA, we use the `limma` package. `limma` was originally released as a software package to perform the statistical analysis of microarray data, but was later [adapted for the analysis of RNA-Seq](https://academic.oup.com/nar/article/43/7/e47/2414268). `limma` fits a linear model for each gene according to the experimental design to test the null hypothesis that no gene is differentially expressed between experimental conditions, and calculates a moderated *t*-statistic. To do so, it uses an empirical Bayes method to improve estimation of the underlying variance. For more information, please see "Shared global parameters link gene-wise models" and "Empirical Bayes borrows information between genes" of the aforementioned paper. `limma` is not the only option to perform DEA. Common alternatives include [`edgeR`](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2796818/) and [`DESeq2`](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-014-0550-8). The strategy that we employ here is known as limma-trend, where the initial count matrix is normalized using `edgeR` but the DEA is carried out with `limma`. For more information please see [Limma's users guide](https://www.bioconductor.org/packages/devel/bioc/vignettes/limma/inst/doc/usersguide.pdf).
 
-To carry out the DEA with `limma`, we employ the `lmFit()`, `contrasts.fit()`, `eBayes()` and `topTable()` functions using as input the normalized expression matrix.
+To carry out the DEA with `limma`, we employ the `lmFit()`, `contrasts.fit()`, `eBayes()` and `topTable()` functions using as input the normalized expression matrix
 
 ```{r}
 # create the contrast matrix
