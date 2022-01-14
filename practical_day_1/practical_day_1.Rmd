@@ -1,0 +1,646 @@
+---
+title: "Network Analysis practical session - Day 1"
+date: "2022-01-17 (ISO 8601)"
+author: 
+  - Martín Garrido Rodríguez-Córdoba, Charlotte Boys, Pau Badia-i-Mompel, Aurelien Dugourd
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+    toc: true
+---
+
+# About
+
+This vignette contains the material for the first practical session of the Network Analysis course. It was developed by the [Saez-Rodriguez group members](https://saezlab.org/). The estimated required time to go over the content of the tutorial is of ~ 3 hours. This is the schedule for the practical session:
+
+- Introduction, setup and troubleshooting: 20 minutes
+- Bulk RNA-Seq data quality control and normalization: 30 minutes
+- Differential expression analysis: 30 minutes
+- Break: 10 minutes
+- Functional analysis with MSigDB and decoupleR: 30 minutes
+- Footprint-based analysis with DoRothEA and PROGENy: 45 minutes
+- Conclusions and preparation for day 2: 15 minutes
+
+If you have any question, please contact me at [martin.garrido@uni-heidelberg.de](mailto:martin.garrido@uni-heidelberg.de). Feedback about the tutorial is also highly appreciated.
+
+# Before you start
+
+This tutorial is intended to guide users through the statistical and functional analysis of transcriptomic data. We assume the following skills in the audience:
+
+- Basic knowledge of [git](https://git-scm.com/) and [GitHub](https://github.com/). 
+- Basic knowledge of the [statistical programming language R](https://www.r-project.org/about.html).
+- Basic knowledge about how to load and make use of external R packages, such as those included in the [tidyverse](https://www.tidyverse.org/) and [Bioconductor packages](http://bioconductor.org/).
+- Be familiar with concepts like omics data, biological databases, exploratory data analysis, hypothesis testing and functional analysis.
+
+This tutorial requires:
+
+- R >= 4.1.2 You can download an install R from [this link](https://cran.r-project.org/).
+- The following R packages are also required:
+  - `tidyverse`
+  - `edgeR`
+  - `limma`
+  - `msigdbr`
+  - `decoupleR`
+  - `progeny`
+  - `dorothea`
+- Rstudio is highly recommended to open, run and modify the R code that we will use in this tutorial. You can download and install Rstudio from [this link](https://www.rstudio.com/products/rstudio/download/). Please install RStudio Desktop, Open Source Edition, which is free thanks to its Open Source License.  
+
+# Download and setup instructions
+
+- Please clone the content of the following repository in your computer: https://github.com/saezlab/NetworkModeling_course_2022 
+- If using Rstudio, please double-click the file: `practical_daty_1/practical_day_1.Rproj`
+- The following code chunk takes care of checking and installing those packages in your R installation. Please run it from your computer: 
+
+```{r, message=FALSE}
+# CRAN packages
+cran_packages <- c("tidyverse", "msigdbr", "BiocManager")
+for (i in cran_packages) {
+  if (!require(i, character.only = TRUE))
+    install.packages(i)
+}
+
+# BioC packages
+bioc_packages <-
+  c("decoupleR", "progeny", "dorothea", "limma", "edgeR", "decoupleR")
+for (i in bioc_packages) {
+  if (!require(i, character.only = TRUE))
+    BiocManager::install(i)
+} 
+```
+
+
+The initial part of this tutorial is based in the work from [Law et al. 2016](https://f1000research.com/articles/5-1408/v3). We encourage users to check this nice article which describes how to analyze RNA-Seq data using `limma` and `edgeR`. Similarly, users can also take a look to [this tutorial](http://bioconductor.org/packages/devel/bioc/vignettes/DESeq2/inst/doc/DESeq2.html), which offers an alternative pipeline based in the `DESeq2` package.
+
+# The biology of the tutorial
+
+In this tutorial we will work with a subset of the transcriptomics data available in the GEO entry [GSE173201](https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE173201). This entry contains the data accompanying the publication entitled: ["Genomic Characterization of Cisplatin Response Uncovers Priming of Cisplatin-Induced Genes in a Resistant Cell Line"](https://www.mdpi.com/1422-0067/22/11/5814). Together with debulking surgery, cisplatin-based chemotherapy constitutes a first line treatment for ovarian cancer patient. Unfortunately, many of them develop tumors which are resistant to this chemotherapy, which results in a [5-year survival rate below 50%](https://acsjournals.onlinelibrary.wiley.com/doi/full/10.3322/caac.21654). For simplicity, in this tutorial we compare the basal transcriptomic profiles of two cell lines: A2780 and A2780cis. A2780 is a cell line that was established from an Ovarian endometroid adenocarcinoma tumour in an untreated patient. The A2780cis cell line was created after chronically exposing A2780 cells to increasing concentrations of cisplatin to create a cisplatin-resistant cell line.
+
+# RNA-Seq
+
+The authors of the study employed RNA sequencing (RNA-Seq) to obtain the basal transcriptomic profiles of both A2780 and A2780cis. RNA-Seq is a technology based on Next Generation Sequencing (NGS) that allows researchers to massively measure the abundance of the RNA molecules in a sample. Starting from the biological sample of interest (e.g. the cell culture), the common steps to perform bulk RNA-Sequencing includes: 1) Total RNA extraction and target enrichment, 2) Fragmentation and reverse transcription and amplification (a.k.a. library preparation) and 3) Sequencing of the library (using, for example, Illumina's NextSeq 500). The output of this process consists of thousands of sequences (a.k.a. reads) which are then aligned to a reference genome/transcriptome to obtain a "count" matrix. This count matrix reflects the number of reads that align in a set of genomic regions of interest, and it represents the level to which that region is being expressed by the cells in a given sample. Those regions usually comprise genes, but they can also include other types of transcribed DNA regions, such as microRNAs (miRNAs) or long non-coding RNAs (lncRNAs). This gene expression data is high-throughput, covering on the scale of 10^4^ genes, and gives a detailed snapshot of the transcriptional activity of the cell sample under a given experimental condition at a moment in time.
+
+![](https://www.annualreviews.org/na101/home/literatum/publisher/ar/journals/content/biodatasci/2019/biodatasci.2019.2.issue-1/annurev-biodatasci-072018-021255/20190704/images/medium/bd020139.f1.gif)
+
+Figure from [Van den Berge et al. 2019](https://www.annualreviews.org/doi/abs/10.1146/annurev-biodatasci-072018-021255)
+
+Traditional RNA-Seq protocols measures the RNA samples obtained from a cell population that can be more or less heterogeneous (**bulk**). In contrast to theme, novel techniques enable researchers to obtain transcriptomic profiles that are resolved at the single-cell level or that are spatially resolved. **Here we will focus on bulk RNA-Seq data**. For more information about single-cell and spatial transcriptomic technologies, we recommend users to read the comprehensive review written by [Stark et al](https://www.nature.com/articles/s41576-019-0150-2).
+
+# Loading packages and data in R
+
+We will first load the packages that we will employ during the tutorial
+
+```{r, message=FALSE}
+library(tidyverse)
+library(edgeR)
+library(limma)
+library(msigdbr)
+library(decoupleR)
+library(progeny)
+library(dorothea)
+```
+
+Next, we read the data tables that contain the count matrix and samples' metadata. Those tables are stored in the format `.tsv`, which stands for "tab-separated values". A tab-separated values file is a simple text format for storing data in a tabular structure
+
+```{r, message=FALSE}
+counts <-
+  read.table(
+    "data/counts.tsv",
+    header = TRUE,
+    sep = "\t",
+    row.names = 1
+  )
+metadata <- readr::read_tsv("data/metadata.tsv")
+```
+
+**NOTE**: In the second line, we employ different functions to read the tables. The first one, `read.table()`, is a base R function. The second one, `read_tsv()`, belongs to the `readr` package, which is part of the `tidyverse` collection. We use the `::` nomenclature to indicate the package that provides the function. This is a good R coding practice, because it prevents the conflicts that may appear as a product of common function names between packages. However, while using such nomenclature is recommended, it is not mandatory when the name of functions is less likely to cause conflicts. 
+
+Next, we can now explore how the first rows of the counts matrix looks like. In this matrix, rows correspond to genes (here, labelled by their [HUGO gene symbol](https://www.genenames.org/)) and columns represent samples from which the expression data was measured.
+
+```{r}
+head(counts)
+```
+
+We can also explore the content of the metadata table, which contain the properties/annotations of each sample. Additional information that can be found in this type of tables include whether data is paired or not, or for example known batch effects, such as different sequencing lanes. Very often, this information is not explicitly provided but can be inferred from the sample name: e.g. PATIENT1_TUMOR_BATCH1 vs PATIENT2_NORMAL_BATCH2. 
+
+```{r}
+metadata
+```
+
+# Quality control and pre-processing
+
+## Checking library size
+
+Before being able to compare data from both cell lines, we should perform basic quality control analyses and some pre-processing of the count matrix. In a first step, we can take a look to the total number of sequences per sample, which is also known as the library size. This reflects the sequencing depth and it is a good indicator of of homogeneity in the sequencing process of the samples.
+
+```{r}
+data.frame(sample = colnames(counts), n_counts = colSums(counts)) %>%
+  ggplot2::ggplot(aes(x = sample, y = n_counts)) +
+  ggplot2::geom_col() +
+  ggplot2::scale_y_continuous()
+```
+
+**NOTE**: Inside this code chunk, we employ several functions. First, we create a data frame with the id of the samples and the total number of counts for each of them using the `data.frame()` and the `colSums()` functions. Next, we pass this data frame object to the `ggplot()` function to start creating the plot. This is done thanks to the pipe operand `%>%`, which passes the data frame created before it to to the function positioned after. For more information about the pipe operand please see [this documentation page](https://style.tidyverse.org/pipes.html). 
+
+**NOTE**: The ggplot2 package, which is part of the `tidyverse` collection, is here employed to create the plot. ggplot2 comprises a powerful yet simple framework to create and modify high-quality graphics. For more information, please see [ggplot2 homepage](https://ggplot2.tidyverse.org/).
+
+As it can be observed in the plot, the library sizes range from 4 to 5 millions of sequences. This means that the ratio between the largest and the smallest libraries is of ~ 1.25. This is an acceptable value for most statistical approaches. When this ratio is higher than ~3, ad-hoc adjustments should be made to consider the heterogeneity in library sizes. We will talk more about this in the [normalization](#Normalization) section of the tutorial. 
+
+## Filtering lowly expressed genes
+
+Next, the count matrix data can be filtered to remove genes which are lowly expressed across conditions or not expressed at all. The reasons for this are biological as well as statistical. Firstly, genes which are expressed at low levels across the different samples are likely to arise from noise in the sequencing process, or are otherwise not likely to be biologically meaningful and are therefore best ignored in the downstream analysis. Secondly, removing genes with low counts allows the mean-variance relationship to be more reliably estimated and reduces the number of statistical tests performed during differential analysis.
+
+Here, to remove lowly expressed genes we will make use of the function `filterByExpr()` function from the `edgeR` package. From [Law et al. 2016](https://f1000research.com/articles/5-1408/v3): "By default, the function keeps genes with about 10 read counts or more in a minimum number of samples, where the number of samples is chosen according to the minimum group sample size. The actual filtering uses CPM values rather than counts in order to avoid giving preference to samples with large library sizes". 
+
+```{r}
+# apply fitlerByExpr function to retrieve a boolean vector indicating which genes should be retained
+design_matrix <- model.matrix( ~ 0 + group, data = metadata)
+keep <- edgeR::filterByExpr(counts, design = design_matrix)
+
+# use the boolean vector to filter the count matrix
+counts_filtered <- counts[keep,]
+
+# print a message to show the number of genes that are retrieved after filtering
+message(
+  "From ",
+  nrow(counts),
+  " genes, ",
+  sum(!keep),
+  " using filterByExpr(). The resulting count matrix contains ",
+  nrow(counts_filtered),
+  " genes."
+)
+```
+
+**NOTE:** We created an object called `design_matrix` to apply the `filterByExpr()` function. This design matrix encodes the experimental group to which each sample belongs in the form of zero and ones and will be used later in the differential expression analysis.
+
+**NOTE**: Explore the content of the `design_matrix object`
+
+In addition, we can also visualize the per-sample count distribution before and after filtering lowly expressed genes. To this end, we first create a helper function that generates the desired plot
+
+```{r}
+# in order to avoid redundancy, we create a helper function here
+plot_count_distribution <- function(c) {
+  
+  p <- c %>%
+    tibble::rownames_to_column(var = "gene_symbol") %>%
+    tidyr::pivot_longer(-gene_symbol, names_to = "sample", values_to = "n_counts") %>%
+    ggplot2::ggplot(aes(x = log2(n_counts + 1), fill = sample)) +
+    ggplot2::geom_histogram(binwidth = 0.1) +
+    ggplot2::facet_grid(rows = vars(sample))
+  
+  return(p)
+  
+}
+```
+
+And then apply it to both unfiltered counts
+
+```{r}
+plot_count_distribution(counts) + 
+  ggplot2::ggtitle("Not filtered")
+```
+
+And filtered counts
+
+```{r}
+plot_count_distribution(counts_filtered) + 
+  ggplot2::ggtitle("Filtered")
+```
+
+As it can be observed, a huge proportion of the counts with few counts were filtered. To aid visualization, we log transformed raw counts.
+
+**NOTE**: Go to the chunk of code where we create the `plot_count_distribution()` and substitute the line `geom_histogram(binwidth = 0.1) +` with `geom_density() +`. Then run again the chunks that create the plots. What happens? Run `help(density)` in your terminal to get more information about kernel density estimation.
+
+**OPTIONAL**: Probability distribution in count-based data (negative binomial vs bimodal).
+
+# Normalization
+
+There are multiple factors that can result in libraries of different sizes. Those include experimental variations, batch effects or simply, different sequencing depths. We assume that, if it were not for these variations, all samples should have a similar range and distribution of expression. Therefore, after data filtering, a normalization step is necessary to ensure that gene counts can be compared between samples and experimental conditions. Below, we use the `calcNormFactors()` function from `edgeR` to calculate scaling factors for each sample. It uses the approach described in [Robinson et al. 2010](https://genomebiology.biomedcentral.com/articles/10.1186/gb-2010-11-3-r25), entitled "trimmed mean of M values (TMM)".
+
+```{r}
+# create DGEList object
+dge <-
+  edgeR::DGEList(counts = counts_filtered, group = metadata$group)
+
+# apply normalization function
+dge_norm <- edgeR::calcNormFactors(dge, method = "TMM")
+```
+
+We can now use the norm.factors to generate a matrix of normalized gene expression values. To do so, we employ using the counts per million (CPM) approach that can be applied using the `cpm()` function from `edgeR`. In addition, we apply a $\log_2$ transformation in preparation for the differential expression analysis
+
+```{r}
+norm_expr <- edgeR::cpm(dge_norm, log = TRUE)
+```
+
+And have a look to how the normalized values look like:
+
+```{r}
+head(norm_expr)
+```
+
+[**OPTIONAL**: PCA]
+
+# Differential Expression Analysis
+
+Next, we can analyze the differences between the transcriptomic profiles of both cell lines. To do so, we will carry out what is known as Differential Expression Analysis (DEA). This is basically a statistical analysis where all the genes in the count matrix are compared between the sample groups of interest. To perform DEA, we use the `limma` package. `limma` was originally released as a software package to perform the statistical analysis of microarray data, but was later [adapted for the analysis of RNA-Seq](https://academic.oup.com/nar/article/43/7/e47/2414268). `limma` fits a linear model for each gene according to the experimental design to test the null hypothesis that no gene is differentially expressed between experimental conditions, and calculates a moderated *t*-statistic. To do so, it uses an empirical Bayes method to improve estimation of the underlying variance. For more information, please see "Shared global parameters link gene-wise models" and "Empirical Bayes borrows information between genes" of the aforementioned paper. `limma` is not the only option to perform DEA. Common alternatives include [`edgeR`](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2796818/) and [`DESeq2`](https://genomebiology.biomedcentral.com/articles/10.1186/s13059-014-0550-8). The strategy that we employ here is known as limma-trend, where the initial count matrix is normalized using `edgeR` but the DEA is carried out with `limma`. For more information please see [Limma's users guide](https://www.bioconductor.org/packages/devel/bioc/vignettes/limma/inst/doc/usersguide.pdf).
+
+To carry out the DEA with `limma`, we employ the `lmFit()`, `contrasts.fit()`, `eBayes()` and `topTable()` functions using as input the normalized expression matrix.
+
+```{r}
+# create the contrast matrix
+contrast_matrix <-
+  limma::makeContrasts(contrasts = c("groupresistant-groupsensitive"),
+                       levels = design_matrix)
+
+# create linear model
+fit <- limma::lmFit(norm_expr, design = design_matrix)
+
+# fit contrasts
+# "The coefficients, unscaled standard deviations and correlation matrix are re-calculated in terms of the contrasts."
+fit_contrasts <-
+  limma::contrasts.fit(fit, contrasts = contrast_matrix)
+
+# compute moderated statistics using the global parameteres
+ebayes_fit <- limma::eBayes(fit_contrasts)
+
+# retrieve table of differentially expressed genes
+de_table <- limma::topTable(ebayes_fit, number = Inf) %>%
+  tibble::rownames_to_column(var = "gene")
+```
+
+The main product of this analysis is the differential expression table (`de_table`). Lets look at its content:
+
+```{r}
+head(de_table)
+```
+
+The documentation for the `limma` function `topTable()` gives the following information about the statistics in the data frame:
+
+- gene: The gene ID
+- logFC: Estimate of the log2-fold-change corresponding to the effect or contrast
+- AveExpr: Average log2-expression for the probe over all arrays and channels
+- t: Moderated t-statistic (omitted for topTableF)
+- P.Value: Raw p-value
+- adj.P.Val: Adjusted p-value or q-value
+- B: Log-odds that the gene is differentially expressed (omitted for topTreat)
+
+For more information about limma's output, please see [this nice post from Gordon Smyth in bioconductor forums](https://support.bioconductor.org/p/6124/),
+
+We can also produce a short summary of the resulting data frame using the base R `summary()` function:
+
+```{r}
+summary(de_table)
+```
+
+And look at the distribution of the adjusted P values:
+
+```{r}
+ggplot2::ggplot(de_table, aes(x = adj.P.Val)) +
+  ggplot2::geom_histogram()
+```
+
+**NOTE:** Do you remember how the P-value distribution should look like? If not, please see [here](http://varianceexplained.org/statistics/interpreting-pvalue-histogram/).
+
+Our P-value histogram clearly shows an anti-conservative distribution. We can also visualize the gene expression changes using one of the most common plots to explore DE results, the **volcano plot**:
+
+```{r}
+# set cutoffs
+p_cutoff <- 0.0001
+fc_cutoff <- 2
+
+# annotate de_table with status according to cutoffs
+de_table <- de_table %>%
+  dplyr::mutate(
+    status = dplyr::case_when(
+      logFC >= fc_cutoff & adj.P.Val <= p_cutoff ~ "Up",
+      logFC <= -fc_cutoff & adj.P.Val <= p_cutoff ~ "Down",
+      TRUE ~ "Other"
+    )
+  )
+
+#  volcano plots
+ggplot2::ggplot(de_table, aes(x = logFC,-log10(adj.P.Val), color = status)) +
+  ggplot2::geom_point() +
+  ggplot2::geom_vline(xintercept = log2(c(0.25, 0.5, 2, 4)), lty = 2) +
+  ggplot2::geom_hline(yintercept = -log10(c(0.05, 0.01, 0.001, 0.0001)), lty = 2) +
+  ggplot2::scale_color_manual(values = c(
+    "Up" = "red",
+    "Down" = "blue",
+    "Other" = "black"
+  ))
+```
+
+A volcano plot enables us to quickly visualize the magnitude (logFC) and significance (-log10(pvalue)) of DE changes. Each point represent a gene, and its color indicates whether they surpass or not a cutoff of an absolute logFC > `r fc_cutoff` and an adjusted P value < `r p_cutoff`. 
+
+**QUESTION**: What do the horizontal and vertical dashed lines mean in this plot? Take a look at the code and think about their meaning. 
+
+**QUESTION**: Try to modify the `fc_cutoff` and and `p_cutoff` variables in this chunk. What happens? What cutoff values should we use? 
+
+# Functional analysis
+
+Thanks to the DEA, we know which genes are different between the two cell lines, with measurements that indicate us the magnitude and the significance of the changes. But now we face one of the most prominent bottlenecks in the analysis of omics data: The extraction of biological insights that we can further interpret and link to a particular phenotype. A manual exploration of the genes is not an option, given that our dataset comprises `r nrow(de_table)` genes, from which `r sum(de_table$status == "Up" | de_table$status == "Down")` surpassed the previously established cutoffs. Hence, we need an approach that enable us to reduce the number of features to interpret, and that help us to link observation from our dataset with previous knowledge. Welcome to the **functional analysis section of the tutorial**.
+
+In the next steps, we employ **prior biological knowledge** retrieved from multiple biological resources. To perform the different analyses we employ the [decoupleR framework](https://github.com/saezlab/decoupleR), a recent development from the Saez-Rodriguez group which offers 12 different statistical approaches to perform the functional analysis of omics data. 
+
+![](https://github.com/saezlab/decoupleR/raw/master/inst/figures/graphical_abstract.png?raw=1)
+
+To perform the functional analysis with decoupleR, we need to prepare the results from our DEA in the appropriate format. As `decoupleR` functions expect a matrix as input, we are going to create a one-column matrix from the `de_table` object. This one column matrix contains the vector of T values obtained from limma. We choose the T values over other metrics because it combines the significance and the magnitude of the DE changes.
+
+```{r}
+decoupler_input <- tibble::column_to_rownames(de_table, "gene") %>%
+  dplyr::select(t) %>%
+  dplyr::arrange(desc(t)) %>%
+  as.matrix()
+```
+
+We can explore how those T values are distributed using a histogram:
+
+```{r}
+de_table %>%
+  dplyr::arrange(desc(t)) %>%
+  dplyr::mutate(gene = forcats::fct_inorder(gene)) %>%
+  ggplot2::ggplot(aes(x = t)) +
+  ggplot2::geom_histogram(binwidth = 10) 
+```
+
+## The functional categories of MSigDB
+
+In this section, we work with the prior biological knowledge that can be retrieved from the [Molecular Signatures Database (MSigDB) database](https://www.gsea-msigdb.org/gsea/msigdb/). This database contains functional annotations for human genes and is divided in 9 major collections. For simplicity, we only work here with data retrieved from one of them, but all the collections can retrieve interesting insights if the appropriate question is asked (e.g. genome positional gene sets). We will employ the functional categories defined by [WikiPathways](https://www.wikipathways.org/index.php/WikiPathways). WikiPathways is a manually curated database of biological pathways. It contains maps for multiple types of biological processes that range from protein-driven cellular signaling, to metabolism and genomic regulation. We first download the annotation tables using the `msigdbr` package:
+
+```{r}
+# retrieve GO terms table
+wikipathways <- msigdbr::msigdbr(species = "Homo sapiens",
+                                 category = "C2",
+                                 subcategory = "CP:WIKIPATHWAYS")
+```
+
+And have a look to its content:
+
+```{r}
+head(wikipathways)
+```
+
+Next, we transform them into objects compatible with `decoupleR`
+
+```{r}
+# helper function to transform msigdb data frames into decoupler compatible data frames
+msigdb_to_decoupler <- function(df) {
+  
+  output <- df %>%
+    dplyr::transmute(
+      source = gs_name,
+      target = gene_symbol,
+      mor = 1,
+      likelihood = 1
+    ) %>%
+    dplyr::distinct()
+  return(output)
+  
+}
+
+# apply to data frame
+wiki_decoupler <- msigdb_to_decoupler(wikipathways)
+```
+
+### Over-representation Analysis (ORA)
+
+The first method that we will employ to perform the functional analysis of our results is called over-representation analysis (ORA). In brief, we select the **top N** up and down regulated genes according to their T values and evaluate which functional categories are over-represented on them (as explained in the theoretical part of the course). To do so, we employ a hyper-geometric tests the null of independence of rows and columns in contingency tables that take the following form:
+
+|                   | Genes in category | Genes not in category (Background) |
+|-------------------|-------------------|------------------------------------|
+| Altered genes     |                 30|                                 270|
+| Not altered genes |                 70|                                9930|
+
+And which hence tests the following hypotheses:
+
+- H~0~: Genes belonging to the category are altered in the same proportion than the rest of genes
+- H~1~: Genes belonging to the category are altered a higher proportion than the rest of genes
+
+To carry out the over-representation analysis in the top N up and down regulated genes, we use the `run_ora()` function from `decoupleR`:
+
+```{r}
+# set the top N
+n_top <- 50
+
+# run for up-regulated genes using n_up
+ora_up <- decoupleR::run_ora(
+  mat = decoupler_input,
+  network = wiki_decoupler,
+  n_up = n_top,
+  n_bottom = 0,
+  .source = "source",
+  .target = "target"
+) %>%
+  dplyr::mutate(adj_p = p.adjust(p_value, method = "BH"))
+
+# run for down-regulated genes using n_bottom
+ora_down <- decoupleR::run_ora(
+  mat = decoupler_input,
+  network = wiki_decoupler,
+  n_up = 0,
+  n_bottom = n_top,
+  .source = "source",
+  .target = "target"
+) %>%
+  dplyr::mutate(adj_p = p.adjust(p_value, method = "BH"))
+
+# bind both data frames
+ora_results <- list(Up = ora_up, Down = ora_down) %>%
+  dplyr::bind_rows(.id = "status") %>%
+  dplyr::arrange(p_value)
+```
+
+**QUESTION**: What is the `p.adjust()` function? Why do we apply it here?
+
+And look to top 10 up and down regulated functional categories:
+
+```{r, fig.width=10, fig.height=3.5}
+# plot them
+ora_results %>%
+  dplyr::group_by(status) %>%
+  dplyr::slice_head(n = 10) %>%
+  dplyr::mutate(source = forcats::fct_rev(forcats::fct_inorder(source))) %>%
+  ggplot2::ggplot(aes(x = -log10(p_value), y = source, fill = status)) +
+  ggplot2::geom_bar(stat = "identity") +
+  ggplot2::scale_fill_manual(values = c("Up" = "red", "Down" = "blue")) 
+```
+
+**QUESTION**: Do you think that the ORA results are significant? Why? **Tip**: Check the content of the `ora_results` object.
+
+**QUESTION**: Try to perform the same analysis using a different number of top up and down regulated genes modifying the `n_top` variable. How do the results change?
+
+### Set Enrichment Analysis (SEA)
+
+In the previous section, we selected a number of top up and down regulated genes to perform the ORA. The number of genes has a profound impact on the results and setting this threshold is not always easy. An alternative to ORA are the methods that belong to the category of "Functional Class Scoring (FCS)". These type of methods became very popular after the publication of the Gene Set Enrichment Analysis (GSEA) method by [Subramanian et al. 2005](https://www.pnas.org/content/102/43/15545).
+
+![](https://www.pnas.org/content/pnas/102/43/15545/F1.large.jpg?width=800&height=600&carousel=1) 
+
+Figure from Subramanian et al. 2005
+
+In contrast to ORA, the SEA does not require users to establish an arbitrary threshold of genes that are up or down regulated and which are worth exploring in a functional context. Instead, it uses a summary statistic for all the genes that belong to a certain functional category and assess the significance of the results, usually through the calculation of permutation-based null distributions. By doing so, it assumes that the members of a de-regulated functional category should have a more extreme position in the list of input genes when those are ranked by a metric that describes a phenotype (e.g. The T value or the logFC that we calculate in this tutorial).  
+
+We are now going to try one of these approaches employing the `run_wmean()` function from the `decoupleR` package. This function will perform a weighted mean of the T values from genes that belong to a given functional category. In this example, we only use a weight of 1 to indicate whether a gene belongs or not to a pathway. More sophisticated analyses can be carried out using both the `.mor` and `.likelihood` parameters, as we will see below. We now carry out the FCS-like analysis using `decoupleR`:
+
+```{r}
+wmean_results <- run_wmean(
+  mat = decoupler_input,
+  network = wiki_decoupler,
+  times = 2000,
+  .source = "source",
+  .target = "target",
+  .mor = "mor",
+  .likelihood = "likelihood"
+) %>%
+  subset(statistic == "norm_wmean") %>%
+  dplyr::mutate(adj_p = p.adjust(p_value, method = "BH"))
+```
+
+And plot the top 10 up and down regulated pathways according to the results of the `run_wmean()` function:
+
+```{r, fig.width=10, fig.height=3.5}
+# given that we are going to create several plots like this, we create a helper function
+plot_fcs_results <- function(df) {
+  
+  p <- df %>%
+    dplyr::mutate(status = ifelse(score > 0, "Up", "Down")) %>%
+    dplyr::arrange(p_value) %>%
+    dplyr::group_by(status) %>%
+    dplyr::slice_head(n = 10) %>%
+    dplyr::arrange(score) %>%
+    dplyr::mutate(source = forcats::fct_inorder(source)) %>%
+    ggplot2::ggplot(aes(x = score, y = source, fill = status)) +
+    ggplot2::geom_bar(stat = "identity") +
+    ggplot2::scale_fill_manual(values = c("Up" = "red", "Down" = "blue"))
+  
+  return(p)
+  
+}
+
+plot_fcs_results(wmean_results)
+```
+
+**QUESTION**: What do the Y axis and X axis represent in this plot?
+
+**QUESTION**: Are these results significant? Why? 
+
+**QUESTION**: What does the `times` parameter control inside the `run_wmean()` function? Try to tune this parameter and see what happens (**WARNING: Do not set it above 10000**).
+
+## Footprint-based analyses
+
+Until now, we have used the functional categories as specified in WikiPathways. We have only considered whether a gene belongs to a given pathway or not. In addition, we have used the gene expression changes as a proxy of the pathway activity changes. Unconsciously, we have made the following assumption: The gene expression measurements (as obtained from RNA-Seq) are a good proxy of the resulting gene product (proteins) activities. This is a big assumption and a huge leap in within the central dogma of biology. Some articles like [Liu et al 2016](https://www.sciencedirect.com/science/article/pii/S0092867416302707?via%3Dihub) or [Buccitelli et al. 2020](https://www.nature.com/articles/s41576-020-0258-4) provide a good perspective about the topic. 
+
+![](https://media.springernature.com/full/springer-static/image/art%3A10.1038%2Fs41576-020-0258-4/MediaObjects/41576_2020_258_Fig1_HTML.png?as=webp)
+
+A new generation of computational methods, known as "footprint-based analysis" do not make this assumption, but instead employ the omics data as a signatures of upstream biological activities. 
+
+![](https://ars.els-cdn.com/content/image/1-s2.0-S2452310019300149-gr1_lrg.jpg) 
+
+Figure from [Dugourd et al. 2019](https://www.sciencedirect.com/science/article/pii/S2452310019300149?via%3Dihub).
+
+DoRothEA and PROGENy are prior knowledge resources which we can couple with a statistical method to extract insights about biological activities from transcriptomic data.
+
+### Transcription factor activity estimation
+
+Transcription factors (TFs) are proteins that regulate the transciption rate of genes. When active, these proteins binds to specific DNA regions, promoting or inhibiting the expression of certain genes. Given the biological proximity of TFs to transcriptomic changes, it is reasonable to assume that we can employ this omic signature to infer the regulatory activity of upstream TFs. But for this, we need to know the (positive or negative) interactions between certain TFs and genes. [DoRothEA](https://github.com/saezlab/dorothea) is a prior knowledge resource that provides exactly this type of information. DoRothEA interactions define TF-gene regulatory mechanisms and were "curated and collected from different types of evidence such as literature curated resources, ChIP-seq peaks, TF binding site motifs and interactions inferred directly from gene expression". For more information about DoRothEA, please see [Garcia-Alonso et al. 2019](https://genome.cshlp.org/content/29/8/1363). We can retrieve the content of DoRothEA from the R package `dorothea`. Lets have a look to its content.
+
+```{r}
+dorothea_interactions <- dorothea::dorothea_hs %>%
+  subset(confidence %in% c("A", "B", "C")) %>%
+  dplyr::mutate(likelihood = 1)
+
+head(dorothea_interactions)
+```
+
+**OPTIONAL**: Explore the prior knowledge using networks and showing basic graph theory concepts like node, interaction, degree... etc
+
+**QUESTION**: What does the "confidence" column represent? What defines the different levels of evidence in this resource?
+
+**QUESTION**: What does the "mor" column represent? Discuss about the sign of interactions in prior knowledge and biological networks.
+
+Similar to what we have previously done with the functional categories based on WikiPathways, we can apply the `run_wmean()` function from `decoupler` using the functional sets defined by DoRothEA TFs.
+
+```{r}
+tf_activity_results <- run_wmean(
+  mat = decoupler_input, 
+  network =dorothea_interactions, 
+  times = 2000,
+  .source = "tf",
+  .target = "target",
+  .mor = "mor",
+  .likelihood = "likelihood"
+) %>%
+  subset(statistic == "norm_wmean") %>%
+  dplyr::mutate(adj_p = p.adjust(p_value, method = "BH"))
+```
+
+And visualize the top altered TFs
+
+```{r}
+plot_fcs_results(tf_activity_results)
+```
+
+### Prediciting the activity of signaling pahtways with PROGENy
+
+While TFs are very close to transcriptomic changes, protein-driven signaling pathways are not. This is why estimating their activity from transcriptomic data is not a straightforward task. Following the footprint-based philosophy, [PROGENy](https://github.com/saezlab/progeny) is a resource that address this gap. In essence, PROGENy is a resource that was built using information from > 500 experiments where one or more signaling pathways were perturbed. By analyzing those experiments, we created a resource that provides information about which transcriptomic changes are associated to certain signaling pathways perturbations. For more information about PROGENy, please see [Schubert et al. 2018](https://www.nature.com/articles/s41467-017-02391-6#Sec2)
+
+![](https://media.springernature.com/lw685/springer-static/image/art%3A10.1038%2Fs41467-017-02391-6/MediaObjects/41467_2017_2391_Fig1_HTML.jpg?as=webp)
+
+Similar to the `dorothea` package, the `progeny` package provides users with the pathway-gene interactions. We can retrieve it and format it according to `decoupler` requirements.
+
+```{r}
+# adapt progeny interactions to decoupler format
+progeny_interactions <-
+  progeny::getModel(organism = "Human", top = 300) %>%
+  as.data.frame() %>%
+  tibble::rownames_to_column(var = "target") %>%
+  tidyr::pivot_longer(-target, names_to = "pathway", values_to = "weight") %>%
+  subset(weight != 0) %>%
+  dplyr::mutate(mor = sign(weight), likelihood = abs(weight))
+
+# show the first interactions
+head(subset(progeny_interactions, weight != 0))
+```
+
+**QUESTION**: What does the "likelihood" column represent? Discuss about the likelihood of interactions, or more general, about the edge weights in prior knowledge networks.
+
+Once with this information, we can perform the pathway activity estimation using, again the functions provided on the `decoupler` package.
+
+```{r}
+progeny_results <- run_wmean(
+  mat = decoupler_input,
+  network = progeny_interactions,
+  times = 2000,
+  .source = "pathway",
+  .target = "target",
+  .mor = "mor",
+  .likelihood = "likelihood"
+) %>%
+  subset(statistic == "norm_wmean") %>%
+  dplyr::mutate(adj_p = p.adjust(p_value, method = "BH"))
+```
+
+And visualize the results
+
+```{r}
+plot_fcs_results(progeny_results)
+```
+
+**QUESTION**: How different is the output of this analysis in comparison with the previous ones? What do the Y axis represent? Are the results significant?
+
+**QUESTION**: How do the results of this analysis correlate with the biology of ovarian cancer?
+
+# Take home message and preparation for 2nd day
+
+Today we analyzed a bulk RNA-Seq dataset starting from the raw counts matrix. We performed the quality control and the pre-processing of the count matrix, and applied the TMM+CPM method to obtain the normalized gene expression measurements. We then compared the basal transcriptome of the two cell lines through a differential expression analysis. In a final step, we obtained a set of functional results that enable us to interpret and link our data with the chemoresistant cell line phenotype.
+
+While the first sections are specific to RNA-Seq data, the functional analysis method that we show here are also applicable to other types of sequencing data, proteomics data and even metabolomics data. **The key aspect of this type of analyses is to select a prior knowledge resource that matches our data and that serves to answer a specific question.** 
+
+Tomorrow you will learn how to employ the output of functional analysis approaches to generate mechanistic hypotheses using network approaches. Most of the prior knowledge resources that we employed today can be represented as networks, and as you will see tomorrow, those offer a convenient framework for the mathematical modeling of certain biological processes.
+
+# Session Information
+
+```{r}
+sessionInfo()
+```
+
