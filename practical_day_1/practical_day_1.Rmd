@@ -1,13 +1,11 @@
 ---
 title: "Network Analysis practical session - Day 1"
-date: "2022-01-17 (ISO 8601)"
+date: "17-01-2022"
 author: 
   - Martín Garrido Rodríguez-Córdoba, Charlotte Boys, Pau Badia-i-Mompel, Aurelien Dugourd
-output:
-  prettydoc::html_pretty:
-    theme: cayman
-    highlight: github
-    toc: true
+output: 
+  rmdformats::downcute
+  
 ---
 
 # About
@@ -41,7 +39,7 @@ This tutorial requires:
   - `edgeR`
   - `limma`
   - `msigdbr`
-  - `decoupleR`
+  - `decoupleR >= 2.0.0`
   - `progeny`
   - `dorothea`
 - Rstudio is highly recommended to open, run and modify the R code that we will use in this tutorial. You can download and install Rstudio from [this link](https://www.rstudio.com/products/rstudio/download/). Please install RStudio Desktop, Open Source Edition, which is free thanks to its Open Source License.  
@@ -49,7 +47,7 @@ This tutorial requires:
 # Download and setup instructions
 
 - Please clone the content of the following repository in your computer: https://github.com/saezlab/NetworkModeling_course_2022 
-- If using Rstudio, please double-click the file: `practical_daty_1/practical_day_1.Rproj`
+- If using Rstudio, please double-click the file `practical_daty_1/practical_day_1.Rproj`
 - The following code chunk takes care of checking and installing those packages in your R installation. Please run it from your computer: 
 
 ```{r, message=FALSE}
@@ -153,9 +151,11 @@ Next, the count matrix data can be filtered to remove genes which are lowly expr
 Here, to remove lowly expressed genes we will make use of the function `filterByExpr()` function from the `edgeR` package. From [Law et al. 2016](https://f1000research.com/articles/5-1408/v3): "By default, the function keeps genes with about 10 read counts or more in a minimum number of samples, where the number of samples is chosen according to the minimum group sample size. The actual filtering uses CPM values rather than counts in order to avoid giving preference to samples with large library sizes". 
 
 ```{r}
+min_counts <- 10
+
 # apply fitlerByExpr function to retrieve a boolean vector indicating which genes should be retained
 design_matrix <- model.matrix( ~ 0 + group, data = metadata)
-keep <- edgeR::filterByExpr(counts, design = design_matrix)
+keep <- edgeR::filterByExpr(counts, design = design_matrix, min.count = min_counts)
 
 # use the boolean vector to filter the count matrix
 counts_filtered <- counts[keep,]
@@ -175,6 +175,8 @@ message(
 **NOTE:** We created an object called `design_matrix` to apply the `filterByExpr()` function. This design matrix encodes the experimental group to which each sample belongs in the form of zero and ones and will be used later in the differential expression analysis.
 
 **NOTE**: Explore the content of the `design_matrix object`
+
+**QUESTION**: What happens when you change the `min_counts` argument? Why is 10 a good value? 
 
 In addition, we can also visualize the per-sample count distribution before and after filtering lowly expressed genes. To this end, we first create a helper function that generates the desired plot
 
@@ -212,8 +214,6 @@ To aid visualization, we log transformed raw counts. As it can be observed, the 
 
 **NOTE**: Go to the chunk of code where we create the `plot_count_distribution()` and substitute the line `geom_histogram(binwidth = 0.1) +` with `geom_density() +`. Then run again the chunks that create the plots. What happens? Run `help(density)` in your terminal to get more information about kernel density estimation.
 
-**OPTIONAL**: Probability distribution in count-based data (negative binomial vs bimodal)
-
 # Normalization
 
 There are multiple factors that can result in libraries of different sizes. Those include experimental variations, batch effects or simply, different sequencing depths. We assume that, if it were not for these variations, all samples should have a similar range and distribution of expression. Therefore, after data filtering, a normalization step is necessary to ensure that gene counts can be compared between samples and experimental conditions. Below, we use the `calcNormFactors()` function from `edgeR` to calculate scaling factors for each sample. It uses the approach described in [Robinson et al. 2010](https://genomebiology.biomedcentral.com/articles/10.1186/gb-2010-11-3-r25), entitled "trimmed mean of M values (TMM)".
@@ -239,7 +239,7 @@ And have a look to how the normalized values look like:
 head(norm_expr)
 ```
 
-[**OPTIONAL**: PCA]
+**QUESTION**: Using TMM + CPMs, can we compare the normalized expression values between genes?
 
 # Differential Expression Analysis
 
@@ -634,9 +634,9 @@ plot_fcs_results(progeny_results)
 
 Today we analyzed a bulk RNA-Seq dataset starting from the raw counts matrix. We performed the quality control and the pre-processing of the count matrix, and applied the TMM+CPM method to obtain the normalized gene expression measurements. We then compared the basal transcriptome of the two cell lines through a differential expression analysis. In a final step, we obtained a set of functional results that enable us to interpret and link our data with the chemoresistant cell line phenotype.
 
-While the first sections are specific to RNA-Seq data, the functional analysis method that we show here are also applicable to other types of sequencing data, proteomics data and even metabolomics data. **The key aspect of this type of analyses is to select a prior knowledge resource that matches our data and that serves to answer a specific question.** 
+While the first sections are specific to RNA-Seq data, the functional analysis methodx that we show here are also applicable to other types of sequencing data, proteomics data and even metabolomics data. **The key aspect of the functional analysis is to select a prior knowledge resource that matches our data and that serves to answer a specific question.** 
 
-Tomorrow you will learn how to employ the output of functional analysis approaches to generate mechanistic hypotheses using network approaches. Most of the prior knowledge resources that we employed today can be represented as networks, and as you will see tomorrow, those offer a convenient framework for the mathematical modeling of certain biological processes.
+Tomorrow you will learn how to employ network methods to generate mechanistic hypotheses. Most of the prior knowledge resources that we employed today can be represented as networks, and as you will see tomorrow, those offer a convenient framework for the mathematical modeling of certain biological processes.
 
 # Session Information
 
