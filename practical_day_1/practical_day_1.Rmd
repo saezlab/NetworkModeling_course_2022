@@ -63,7 +63,7 @@ bioc_packages <-
   c("decoupleR", "progeny", "dorothea", "limma", "edgeR", "decoupleR")
 for (i in bioc_packages) {
   if (!require(i, character.only = TRUE))
-    BiocManager::install(i)
+    BiocManager::install(i, update = FALSE)
 } 
 ```
 
