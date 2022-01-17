@@ -78,10 +78,6 @@ In this tutorial we will work with a subset of the transcriptomics data availabl
 
 The authors of the study employed RNA sequencing (RNA-Seq) to obtain the basal transcriptomic profiles of both A2780 and A2780cis. RNA-Seq is a technology based on Next Generation Sequencing (NGS) that allows researchers to massively measure the abundance of the RNA molecules in a sample. Starting from the biological sample of interest (e.g. the cell culture), the common steps to perform bulk RNA-Sequencing include: 1) Total RNA extraction and target enrichment, 2) Fragmentation and reverse transcription and amplification (a.k.a. library preparation) and 3) Sequencing of the library (using, for example, Illumina's NextSeq 500). The output of this process consists of thousands of sequences (a.k.a. reads) which are then aligned to a reference genome/transcriptome to obtain a "count" matrix. This count matrix reflects the number of reads that align in a set of genomic regions of interest, and it represents the level to which that region is being expressed in a given sample. Those regions usually comprise genes, but they can also include other types of transcribed DNA regions, such as microRNAs (miRNAs) or long non-coding RNAs (lncRNAs). This gene expression data is high-throughput, covering on the scale of 10^4^ genes, and gives a detailed snapshot of the transcriptional activity of the cell sample under a given experimental condition at a moment in time.
 
-![](https://www.annualreviews.org/na101/home/literatum/publisher/ar/journals/content/biodatasci/2019/biodatasci.2019.2.issue-1/annurev-biodatasci-072018-021255/20190704/images/medium/bd020139.f1.gif)
-
-Figure from [Van den Berge et al. 2019](https://www.annualreviews.org/doi/abs/10.1146/annurev-biodatasci-072018-021255)
-
 Traditional RNA-Seq protocols measures the RNA samples obtained from a cell population that can be more or less heterogeneous (**bulk**). In contrast to them, novel techniques enable researchers to obtain transcriptomic profiles that are resolved at the single-cell level or that are spatially resolved. **Here we will focus on bulk RNA-Seq data**. For more information about single-cell and spatial transcriptomic technologies, we recommend users to read the comprehensive review written by [Stark et al](https://www.nature.com/articles/s41576-019-0150-2).
 
 # Loading packages and data in R
@@ -305,7 +301,7 @@ ggplot2::ggplot(de_table, aes(x = adj.P.Val)) +
 Our P-value histogram clearly shows an anti-conservative distribution. We can also visualize the gene expression changes using one of the most common plots to explore DE results, the **volcano plot**:
 
 ```{r}
-# set cutoffs
+# set cutoffsa
 p_cutoff <- 0.0001
 fc_cutoff <- 2
 
@@ -474,10 +470,6 @@ ora_results %>%
 
 In the previous section, we selected a number of top up and down regulated genes to perform the ORA. The number of genes has a profound impact on the results and setting this threshold is not always easy. An alternative to ORA are the methods that belong to the category of "Functional Class Scoring (FCS)". These type of methods became very popular after the publication of the Gene Set Enrichment Analysis (GSEA) method by [Subramanian et al. 2005](https://www.pnas.org/content/102/43/15545).
 
-![](https://www.pnas.org/content/pnas/102/43/15545/F1.large.jpg?width=800&height=600&carousel=1) 
-
-Figure from Subramanian et al. 2005
-
 In contrast to ORA, the SEA does not require users to establish an arbitrary threshold of genes that are up or down regulated and which are worth exploring in a functional context. Instead, it uses a summary statistic for all the genes that belong to a certain functional category and assess the significance of the results, usually through the calculation of permutation-based null distributions. By doing so, it assumes that the members of a de-regulated functional category should have a more extreme position in the list of input genes when those are ranked by a metric that describes a phenotype (e.g. The T value or the logFC that we calculate in this tutorial).  
 
 We are now going to try one of these approaches employing the `run_wmean()` function from the `decoupleR` package. This function will perform a weighted mean of the T values from genes that belong to a given functional category. In this example, we only use a weight of 1 to indicate whether a gene belongs or not to a pathway. More sophisticated analyses can be carried out using both the `.mor` and `.likelihood` parameters, as we will see below. We now carry out the FCS-like analysis using `decoupleR`:
@@ -530,8 +522,6 @@ plot_fcs_results(wmean_results)
 
 Until now, we have used the functional categories as specified in WikiPathways. We have only considered whether a gene belongs to a given pathway or not. In addition, we have used the gene expression changes as a proxy of the pathway activity changes. Unconsciously, we have made the following assumption: The gene expression measurements (as obtained from RNA-Seq) are a good proxy of the resulting gene product (proteins) activities. This is a big assumption and a huge leap in within the central dogma of biology. Some articles like [Liu et al 2016](https://www.sciencedirect.com/science/article/pii/S0092867416302707?via%3Dihub) or [Buccitelli et al. 2020](https://www.nature.com/articles/s41576-020-0258-4) provide a good perspective about the topic. 
 
-![](https://media.springernature.com/full/springer-static/image/art%3A10.1038%2Fs41576-020-0258-4/MediaObjects/41576_2020_258_Fig1_HTML.png?as=webp)
-
 A new generation of computational methods, known as "footprint-based analysis" do not make this assumption, but instead employ the omics data as a signatures of upstream biological activities. 
 
 ![](https://ars.els-cdn.com/content/image/1-s2.0-S2452310019300149-gr1_lrg.jpg) 
@@ -583,8 +573,6 @@ plot_fcs_results(tf_activity_results)
 ### Prediciting the activity of signaling pahtways with PROGENy
 
 While TFs are very close to transcriptomic changes, protein-driven signaling pathways are not. This is why estimating their activity from transcriptomic data is not a straightforward task. Following the footprint-based philosophy, [PROGENy](https://github.com/saezlab/progeny) is a resource that address this gap. In essence, PROGENy is a resource that was built using information from > 500 experiments where one or more signaling pathways were perturbed. By analyzing those experiments, we created a resource that provides information about which transcriptomic changes are associated to certain signaling pathways perturbations. For more information about PROGENy, please see [Schubert et al. 2018](https://www.nature.com/articles/s41467-017-02391-6#Sec2)
-
-![](https://media.springernature.com/lw685/springer-static/image/art%3A10.1038%2Fs41467-017-02391-6/MediaObjects/41467_2017_2391_Fig1_HTML.jpg?as=webp)
 
 Similar to the `dorothea` package, the `progeny` package provides users with the pathway-gene interactions. We can retrieve it and format it according to `decoupler` requirements.
 
