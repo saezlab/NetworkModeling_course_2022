@@ -1,7 +1,7 @@
 ---
 title: "Logic models"
 author: "J. Tanevski & A. Gabor"
-date: "1642593600000 (Unix time)"
+date: "1642593600 (Unix time)"
 output:
   rmdformats::downcute:
     df_print: paged
@@ -40,13 +40,15 @@ Differential Equations (ODEs)
 # Dependencies
 
 ```{r message=FALSE, warning=FALSE}
-# installs remotes package if not already installed 
+# installs remotes package if not already installed
 # needed to retrieve and install packages from github
-if(!requireNamespace("remotes", quietly = TRUE)) install.packages("remotes")
+if (!requireNamespace("remotes", quietly = TRUE)) install.packages("remotes")
 
 # installs CellNOptR and CNORode from GitHub
-if(!requireNamespace("CellNOptR", quietly = TRUE)) remotes::install_github("saezlab/CellNOptR")
-if(!requireNamespace("CNORode", quietly = TRUE)) remotes::install_github("saezlab/CNORode")
+if (!requireNamespace("CellNOptR", quietly = TRUE)) 
+  remotes::install_github("saezlab/CellNOptR")
+if (!requireNamespace("CNORode", quietly = TRUE)) 
+  remotes::install_github("saezlab/CNORode")
 ```
 
 If you don't have the package `remotes` and cannot install it, then
@@ -182,8 +184,10 @@ the last condition, where both A and B are activated.
 **TASK 6**: Simulate the model and compare it to the experimental data:
 
 ```{r,fig.height=4, fig.width=4}
-edges <- c("a=c" = 1,
-          "b=c" = 1)
+edges <- c(
+  "a=c" = 1,
+  "b=c" = 1
+)
 
 sim_res <- cutAndPlot(cnodata, model, list(edges))
 ```
@@ -196,13 +200,15 @@ Hint: The model assumes **OR** interaction
 How do we fix it?
 
 ```{r, fig.height=3, fig.width=3}
-prep_model <- preprocessing(data = cnodata,
-                           model = model,
-                           cutNONC = TRUE,  # cut non-controllable subnetwork
-                           compression = TRUE, # compress if possible
-                           expansion = TRUE, # expand OR gates
-                           verbose = TRUE)
-plotModel(prep_model,cnodata)
+prep_model <- preprocessing(
+  data = cnodata,
+  model = model,
+  cutNONC = TRUE, # cut non-controllable subnetwork
+  compression = TRUE, # compress if possible
+  expansion = TRUE, # expand OR gates
+  verbose = TRUE
+)
+plotModel(prep_model, cnodata)
 ```
 
 The preprocessing steps included an **AND** gate between the inputs:
@@ -214,10 +220,12 @@ print(prep_model$reacID)
 Let's fix the model to match the measured data:
 
 ```{r, fig.height=4, fig.width=4}
-# we turn off the a=c and b=c edges: 
-edges <- c("a=c" = 0,
-          "b=c" = 0,
-          "a+b=c" = 1)
+# we turn off the a=c and b=c edges:
+edges <- c(
+  "a=c" = 0,
+  "b=c" = 0,
+  "a+b=c" = 1
+)
 
 sim_res_and <- cutAndPlot(cnodata, prep_model, list(edges))
 ```
@@ -265,7 +273,7 @@ This prior knowledge network contains all the edges among these nodes that we
 think is relevant to the problem.
 
 ```{r}
-plotModel(networkToy,CNOlist = dataToy)
+plotModel(networkToy, CNOlist = dataToy)
 ```
 
 There are red and white nodes:
@@ -283,10 +291,11 @@ According to the prior knowledge, should Hsp27 respond to EGF?
 Let's simulate the prior knowledge and compare it with the data:
 
 ```{r}
-sim_PKN <- cutAndPlot(CNOlist = dataToy,
-           model = networkToy,
-           bStrings = list(rep(1,length(networkToy$reacID))))
-
+sim_PKN <- cutAndPlot(
+  CNOlist = dataToy,
+  model = networkToy,
+  bStrings = list(rep(1, length(networkToy$reacID)))
+)
 ```
 
 Apparently the prior knowledge is not in agreement with the data. This happens,
@@ -299,13 +308,14 @@ To find a *subset* of edges that makes the model to fit the data we use
 optimisation.
 
 ```{r}
-prep_network_Toy <- preprocessing(dataToy, networkToy, 
-                                  expansion=TRUE,
-                                  compression=TRUE,
-                                  cutNONC=TRUE,
-                                  verbose=TRUE)
+prep_network_Toy <- preprocessing(dataToy, networkToy,
+  expansion = TRUE,
+  compression = TRUE,
+  cutNONC = TRUE,
+  verbose = TRUE
+)
 
-plotModel(prep_network_Toy ,dataToy)
+plotModel(prep_network_Toy, dataToy)
 ```
 
 Note the AND gates and missing white boxes. They disappeared beacause of
@@ -314,24 +324,28 @@ compression.
 We use genetic algorithm to find an optimal set of edges.
 
 ```{r}
-ToyT1opt <- gaBinaryT1(CNOlist=dataToy,
-                       model=prep_network_Toy,
-                       verbose=FALSE)
+ToyT1opt <- gaBinaryT1(
+  CNOlist = dataToy,
+  model = prep_network_Toy,
+  verbose = FALSE
+)
 ```
 
 Plot the optimised network's prediction:
 
 ```{r}
-sim_opt_PKN <- cutAndPlot(CNOlist = dataToy,
-           model = prep_network_Toy,
-           bStrings = list(ToyT1opt$bString))
-
+sim_opt_PKN <- cutAndPlot(
+  CNOlist = dataToy,
+  model = prep_network_Toy,
+  bStrings = list(ToyT1opt$bString)
+)
 ```
 
 show the optimised network:
 
 ```{r}
-plotModel(prep_network_Toy,dataToy,bString = ToyT1opt$bString, removeEmptyAnds = F)
+plotModel(prep_network_Toy, dataToy, 
+          bString = ToyT1opt$bString, removeEmptyAnds = F)
 ```
 
 Here the edge color encodes if the edge is still included in the optimised

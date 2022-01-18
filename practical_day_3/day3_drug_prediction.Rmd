@@ -1,7 +1,7 @@
 ---
 title: "Logical models for drug prediction"
 author: "J. Tanevski & A. Gabor"
-date: "1642593600000 (Unix time)"
+date: "1642593600 (Unix time)"
 output:
   rmdformats::downcute:
     df_print: paged
@@ -60,22 +60,34 @@ parameters to data and make predictions.
 ```{r message=FALSE, warning=FALSE}
 
 # To install the packages from Bioconductor you will need the package BiocManager
-if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
+if (!requireNamespace("BiocManager", quietly = TRUE)) {
+  install.packages("BiocManager", repos = "https://ftp.gwdg.de/pub/misc/cran/")
+}
 
 # installs CellNOptR, CNORode and MEIGOR from Bioconductor
-if(!requireNamespace("CellNOptR", quietly = TRUE)) BiocManager::install("CellNOptR")
-if(!requireNamespace("CNORode", quietly = TRUE)) BiocManager::install("CNORode")
-if(!requireNamespace("MEIGOR", quietly = TRUE)) BiocManager::install("MEIGOR")
+if (!requireNamespace("CellNOptR", quietly = TRUE)) {
+  BiocManager::install("CellNOptR")
+}
+if (!requireNamespace("CNORode", quietly = TRUE)) {
+  BiocManager::install("CNORode")
+}
+if (!requireNamespace("MEIGOR", quietly = TRUE)) {
+  BiocManager::install("MEIGOR")
+}
 
 # installs data manipulation packages from the tidyverse
-if(!requireNamespace("dplyr", quietly = TRUE)) 
+if (!requireNamespace("dplyr", quietly = TRUE)) {
   install.packages("dplyr", repos = "https://ftp.gwdg.de/pub/misc/cran/")
-if(!requireNamespace("readr", quietly = TRUE)) 
+}
+if (!requireNamespace("readr", quietly = TRUE)) {
   install.packages("readr", repos = "https://ftp.gwdg.de/pub/misc/cran/")
-if(!requireNamespace("tidyr", quietly = TRUE)) 
+}
+if (!requireNamespace("tidyr", quietly = TRUE)) {
   install.packages("tidyr", repos = "https://ftp.gwdg.de/pub/misc/cran/")
-if(!requireNamespace("ggplot2", quietly = TRUE)) 
+}
+if (!requireNamespace("ggplot2", quietly = TRUE)) {
   install.packages("ggplot2", repos = "https://ftp.gwdg.de/pub/misc/cran/")
+}
 ```
 
 --------------------------------------------------------------------------------
@@ -96,16 +108,18 @@ library(ggplot2)
 # PART I: DRUG response exploration
 
 ```{r message=FALSE}
-IC50 <- read_csv("./data/tutorial_3/IC50_GDSC.csv") %>% rename("cell_line" = "...1")
+IC50 <- read_csv("./data/tutorial_3/IC50_GDSC.csv") %>%
+  rename("cell_line" = "...1")
 print(IC50)
 ```
 
 ```{r message=FALSE}
-IC50 %>% pivot_longer(names_to = "drug_name", values_to = "log_IC50", -cell_line) %>%
+IC50 %>%
+  pivot_longer(names_to = "drug_name", values_to = "log_IC50", -cell_line) %>%
   ggplot() +
-  geom_point(aes(drug_name, log_IC50,col=cell_line)) + 
-  coord_flip() + 
-  theme_bw() + 
+  geom_point(aes(drug_name, log_IC50, col = cell_line)) +
+  coord_flip() +
+  theme_bw() +
   ggtitle("Drug response of 14 CRC cell lines")
 ```
 
@@ -128,17 +142,16 @@ $$\frac{dx_A}{dt} = \tau_A(B(f_1(x),f_2(x),...)-x_A) $$ here
     $$ f(x) = \frac{x^n}{x^n+k^n}$$
 
     ```{r echo=FALSE}
-    x <- seq(0, 30, by = 0.1)
-    n <- seq(2)
-    k <- runif(2, 0, 10)
+x <- seq(0, 30, by = 0.1)
+n <- seq(2)
+k <- runif(2, 0, 10)
 
-    expand_grid(x, k, n) %>% 
-      mutate(f = x^n/(x^n + k^n)) %>% 
-      mutate_at(c("k", "n"), as.factor) %>%
-      ggplot(aes(x = x, y = f)) + 
-      geom_line(aes(color = k, linetype = n)) +
-      theme_classic()
-
+expand_grid(x, k, n) %>%
+  mutate(f = x^n / (x^n + k^n)) %>%
+  mutate_at(c("k", "n"), as.factor) %>%
+  ggplot(aes(x = x, y = f)) +
+  geom_line(aes(color = k, linetype = n)) +
+  theme_classic()
     ```
 
 -   $B$ is a Boolean homologue function. This is responsible to combine the
@@ -189,11 +202,11 @@ importing a prior knowledge network and the perturbation data in MIDAS format.
 # load Prior Knowledge Network (PKN)
 pknmodel <- readSIF("./data/tutorial_3/PKN.sif")
 
-# load normalised perturbation data 
+# load normalised perturbation data
 # select MIDAS file for the desired cell line
 MIDASfile <- "./data/tutorial_3/processed/MIDAS/MD-COLO320HSR_Ktuned_v1_n4_all_noEGFRi_CNORode.csv"
 
-Mydata <- readMIDAS(MIDASfile=MIDASfile, verbose = FALSE)
+Mydata <- readMIDAS(MIDASfile = MIDASfile, verbose = FALSE)
 cnolist <- makeCNOlist(Mydata, subfield = FALSE)
 cnolist$valueStimuli[cnolist$valueStimuli == 0] <- 0.5
 ```
@@ -201,7 +214,7 @@ cnolist$valueStimuli[cnolist$valueStimuli == 0] <- 0.5
 Show the network first
 
 ```{r}
-plotModel(pknmodel,cnolist)
+plotModel(pknmodel, cnolist)
 ```
 
 As in CellNOPt:
@@ -223,53 +236,62 @@ as some nodes increases their activity at the final time (30 mins).
 
 ```{r}
 # compress the network (no expansion, only OR gates are considered)
-model <- preprocessing(data = cnolist, model = pknmodel, compression = TRUE, expansion = FALSE)
+model <- preprocessing(
+  data = cnolist, model = pknmodel,
+  compression = TRUE, expansion = FALSE
+)
 
-# set initial parameters (here parameters 'k' and 'tau' are optimised and 'n' fixed to 3)
-ode_parameters <- createLBodeContPars(model, 
-                                      LB_n = 1, LB_k = 0, LB_tau = 0,
-                                      UB_n = 3, UB_k = 1, UB_tau = 1,
-                                      default_n = 3,
-                                      default_k = 0.5,
-                                      default_tau = 0.01,
-                                      opt_n = FALSE, opt_k = TRUE, opt_tau = TRUE,
-                                      random = TRUE)
+# set initial parameters
+# (here parameters 'k' and 'tau' are optimised and 'n' fixed to 3)
+ode_parameters <- createLBodeContPars(model,
+  LB_n = 1, LB_k = 0, LB_tau = 0,
+  UB_n = 3, UB_k = 1, UB_tau = 1,
+  default_n = 3,
+  default_k = 0.5,
+  default_tau = 0.01,
+  opt_n = FALSE, opt_k = TRUE, opt_tau = TRUE,
+  random = TRUE
+)
 
-# PLX -> BRAF is an artificial regulation used to model paradoxical effect of PLX4720,
-# which works as selective BRAF inhibitor in cell-lines where BRAF is mutated in
-# V600E (i.e. HT29 and SNUC5 in our panel), but induces a paradoxical activation
-# of wild type BRAF cells (modeled as stimulus on those cell lines)
-ode_parameters$parValues[which(ode_parameters$parNames=="PLX_k_BRAF")] <- 0.5
-ode_parameters$index_opt_pars <- setdiff(ode_parameters$index_opt_pars,
-                                        which(ode_parameters$parNames=="PLX_k_BRAF"))
+# PLX -> BRAF is an artificial regulation used to model paradoxical effect of
+# PLX4720, which works as selective BRAF inhibitor in cell-lines where BRAF is
+# mutated in V600E (i.e. HT29 and SNUC5 in our panel), but induces a paradoxical
+# activation of wild type BRAF cells (modeled as stimulus on those cell lines)
+ode_parameters$parValues[which(ode_parameters$parNames == "PLX_k_BRAF")] <- 0.5
+ode_parameters$index_opt_pars <- setdiff(
+  ode_parameters$index_opt_pars,
+  which(ode_parameters$parNames == "PLX_k_BRAF")
+)
 
 ## Parameter Optimization
 # essm
 paramsSSm <- defaultParametersSSm()
 paramsSSm$local_solver <- "DHC"
-paramsSSm$maxtime <- 30; #36000;
-paramsSSm$transfer_function <- 4;
+paramsSSm$maxtime <- 30
+# 36000;
+paramsSSm$transfer_function <- 4
 ```
 
 The actual optimisation takes around 10 mins, instead of the 30 sec. So, instead
 of running it here, we just load the results:
 
 ```{r, eval=FALSE}
-opt_pars = parEstimationLBode(cnolist, model, method="essm",
-                              ode_parameters=ode_parameters,
-                              paramsSSm=paramsSSm)
-#write_rds(opt_pars,"data/tutorial_3/opt_pars_30sec.RDS")
+opt_pars <- parEstimationLBode(cnolist, model,
+  method = "essm",
+  ode_parameters = ode_parameters,
+  paramsSSm = paramsSSm
+)
+# write_rds(opt_pars,"data/tutorial_3/opt_pars_30sec.RDS")
 ```
 
 ```{r}
 opt_pars <- read_rds("data/tutorial_3/opt_pars_30sec.RDS")
-
 ```
 
 Plot the fit of the model:
 
 ```{r}
-sim_res <- CNORode::plotLBodeFitness(cnolist,model,ode_parameters = opt_pars)
+sim_res <- CNORode::plotLBodeFitness(cnolist, model, ode_parameters = opt_pars)
 ```
 
 ```{r, echo=FALSE, out.width='50%'}
@@ -285,7 +307,6 @@ We are interested in the optimised model parameters of this model.
 opt_par_values <- opt_pars$parValues
 names(opt_par_values) <- opt_pars$parNames
 opt_par_values
-
 ```
 
 Similar to the above cell-line, we can build a model for each of the cell lines.
@@ -293,14 +314,16 @@ This is very time consuming, therefore we just load the optimised parameters
 from the paper.
 
 ```{r message=FALSE}
-optimised_parameters <- read_delim("./data/tutorial_3/allModelsParameters.txt",delim = "\t")
+optimised_parameters <- read_delim("./data/tutorial_3/allModelsParameters.txt",
+  delim = "\t"
+)
 ```
 
 Let's check edge and node parameters.
 
 ```{r, out.width='100%'}
 edge_id <- grep("_k_", colnames(optimised_parameters))
-edge_parameters_HM <-  optimised_parameters[edge_id] %>% as.matrix()
+edge_parameters_HM <- optimised_parameters[edge_id] %>% as.matrix()
 rownames(edge_parameters_HM) <- optimised_parameters$cell_line
 # heatmap(edge_parameters_HM, main = "Cell line edge parameters")
 ```
@@ -311,8 +334,8 @@ knitr::include_graphics("./data/tutorial_3/parHeatmap_k.png")
 
 
 ```{r, out.width='100%'}
-node_id <- grep("tau_",colnames(optimised_parameters))
-node_parameters_HM <-  optimised_parameters[node_id]%>% as.matrix()
+node_id <- grep("tau_", colnames(optimised_parameters))
+node_parameters_HM <- optimised_parameters[node_id] %>% as.matrix()
 rownames(node_parameters_HM) <- optimised_parameters$cell_line
 # heatmap(node_parameters_HM, main = "Cell line node parameters")
 ```
@@ -329,30 +352,35 @@ Which model parameters correlates with drug response IC50 ?
 
 ```{r message=FALSE, warning=FALSE}
 # first we need to remove the parameters, that are zero across all the models
-zero_pars <- names(which(colMeans(optimised_parameters[,-1]) == 0))
+zero_pars <- names(which(colMeans(optimised_parameters[, -1]) == 0))
 
 # join the IC50 data and network model parameters based on cell_lines
-drug_model_data <- optimised_parameters %>% select(-zero_pars) %>%
-  gather(parameter,par_value,-cell_line) %>%
-  left_join(IC50 %>% gather(drug, IC50,-cell_line),by = "cell_line")
+drug_model_data <- optimised_parameters %>%
+  select(-zero_pars) %>%
+  gather(parameter, par_value, -cell_line) %>%
+  left_join(IC50 %>% gather(drug, IC50, -cell_line), by = "cell_line")
 
 
 # for each drug and each parameter compute the correlation coefficient
 
-corr_data <- drug_model_data %>% group_by(drug, parameter) %>%
-  summarise(corr_par_drug = cor(par_value,IC50,use = "complete.obs"))
-
+corr_data <- drug_model_data %>%
+  group_by(drug, parameter) %>%
+  summarise(corr_par_drug = cor(par_value, IC50, use = "complete.obs"))
 ```
 
 Let's show some correlation
 
 ```{r}
-corr_data %>% arrange(desc(abs(corr_par_drug))) %>% print(., n=25)
+corr_data %>%
+  arrange(desc(abs(corr_par_drug))) %>%
+  print(., n = 25)
 ```
 
 ```{r, warning=FALSE}
-drug_model_data %>% filter(drug == "Afatinib", parameter == "tau_TBK1") %>%
-  ggplot() + geom_point(aes(par_value, IC50)) + 
+drug_model_data %>%
+  filter(drug == "Afatinib", parameter == "tau_TBK1") %>%
+  ggplot() +
+  geom_point(aes(par_value, IC50)) +
   ggtitle("DRUG: Afatinib; parameter: tau_TBK1")
 ```
 
