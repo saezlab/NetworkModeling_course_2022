@@ -40,3 +40,7 @@ Assess the relevance of your findings: is it a similar type of disease (e.g. can
 Is this connection a potentially interesting futur therapeutic target: Is it a connection that is specific to disease phenotype or general biological function ? Are there existing inhibitors that can target key nodes ofthe pathway? Are there obvious biological alternative routes that could help the cancer cells escape the treatment ? Are those genes associated with poor prognostic (check https://www.proteinatlas.org/)?
 
 What futur experiments could be planed validate this set of mechanistic hypotheses ?
+
+Write a papragraph describing your findings and interpretation.
+
+You can inspire yourself from the 4th paragraph of the discussion section of the COSMOS paper: https://www.embopress.org/doi/full/10.15252/msb.20209730.
